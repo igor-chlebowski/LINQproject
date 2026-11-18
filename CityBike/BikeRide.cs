@@ -25,41 +25,9 @@ public class BikeRide
     public DateTime StartTime;
     public DateTime StopTime;
     public int StartStationId;
-    public string StartStationName = "";
-    public double StartStationLatitude;
-    public double StartStationLongitude;
     public int EndStationId;
-    public string EndStationName = "";
-    public double EndStationLatitude;
-    public double EndStationLongitude;
     public int BikeId;
     public UserType UserType;
     public int BirthYear;
     public Gender Gender;
-
-    public static BikeRide FromCsvLine(string line)
-    {
-        string[] data = line.Split(',');
-        BikeRide bikeRide = new BikeRide
-        {
-            TripDuration = int.Parse(data[0]),
-            StartTime = DateTime.Parse(data[1].Trim('"')),
-            StopTime = DateTime.Parse(data[2].Trim('"')),
-            StartStationId = int.Parse(data[3]),
-            StartStationName = data[4].Trim('"'),
-            StartStationLatitude = double.Parse(data[5], CultureInfo.InvariantCulture),
-            StartStationLongitude = double.Parse(data[6], CultureInfo.InvariantCulture),
-            EndStationId = int.Parse(data[7]),
-            EndStationName = data[8].Trim('"'),
-            EndStationLatitude = double.Parse(data[9], CultureInfo.InvariantCulture),
-            EndStationLongitude = double.Parse(data[10], CultureInfo.InvariantCulture),
-            BikeId = int.Parse(data[11]),
-            UserType = Enum.Parse<UserType>(data[12].Trim('"')),
-            BirthYear = int.Parse(data[13]),
-            Gender = Enum.Parse<Gender>(data[14])
-        };
-
-
-        return bikeRide;
-    }
 }

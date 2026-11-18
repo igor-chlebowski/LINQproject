@@ -26,9 +26,9 @@ public static class Queries
     }
 
     //  1.  Średnia długość przejazdu dla mężczyzny, kobietu i unknown.
-    public static void AverageTripDurationByGender(List<BikeRide> rides)
+    public static void AverageTripDurationByGender(CityBikeData dataBase)
     {
-        var result = rides
+        var result = dataBase.Rides
             .GroupBy(ride => ride.Gender)
             .Select(group => new
             {
@@ -44,9 +44,9 @@ public static class Queries
 
     //  2.  Porównanie Częstotliwości przejazdów Subscriber vs Customer
     //      pod względem dni roboczych i weekendów.
-    public static void SubscriversVsCustomers(List<BikeRide> rides)
+    public static void SubscriversVsCustomers(CityBikeData dataBase)
     {
-        var weekDays = rides
+        var weekDays = dataBase.Rides
             .Where(ride => ride.StartTime.DayOfWeek != DayOfWeek.Saturday && ride.StartTime.DayOfWeek != DayOfWeek.Sunday)
             .GroupBy(ride => ride.UserType)
             .Select(group => new
@@ -55,7 +55,7 @@ public static class Queries
                 Count = group.Count()
             });
 
-        var weekendDays = rides
+        var weekendDays = dataBase.Rides
             .Where(ride => ride.StartTime.DayOfWeek == DayOfWeek.Saturday || ride.StartTime.DayOfWeek == DayOfWeek.Sunday)
             .GroupBy(ride => ride.UserType)
             .Select(group => new
@@ -82,13 +82,14 @@ public static class Queries
     }
 
     //  3.  10 najczęstrzych tras na których jeździli ludzie przez cały rok.
-    public static void TenMostPopularRoutes(List<BikeRide> rides)
+    public static void TenMostPopularRoutes(CityBikeData dataBase)
     {
-        var result = rides
-            .GroupBy(ride => (ride.StartStationName, ride.EndStationName))
+        var result = dataBase.Rides
+            .GroupBy(ride => (ride.StartStationId, ride.EndStationId))
             .Select(group => new
             {
-                Route = group.Key.StartStationName + " -> " + group.Key.EndStationName,
+                StartStation = dataBase.Stations[group.Key.StartStationId],
+                EndStation = dataBase.Stations[group.Key.EndStationId],
                 Count = group.Count()
             })
             .OrderByDescending(group => group.Count)
@@ -96,15 +97,15 @@ public static class Queries
 
         foreach (var item in result)
         {
-            Console.WriteLine($"{item.Route} has been ridden {item.Count} times");
+            Console.WriteLine($"{item.StartStation.Name} -> {item.EndStation.Name} has been ridden {item.Count} times");
         }
     }
 
     //  4.  3 najczęściej użytkowane rowery w każym miesiącu wg. ilości 
     //      przejazdów, oraz łączna ilość godzin jaką jeździły.
-    public static void MostPopularBikes(List<BikeRide> rides)
+    public static void MostPopularBikes(CityBikeData dataBase)
     {
-        var result = rides
+        var result = dataBase.Rides
             .GroupBy(ride => (ride.BikeId, ride.StartTime.Month))
             .Select(group => new
             {
@@ -135,23 +136,26 @@ public static class Queries
     }
 
     //  5.  3 Najdłuższe tras wg. wzoru Haversine'a i średni czas trwania każdego miesiąca.
-    public static void LongestRoutes(List<BikeRide> rides)
+    public static void LongestRoutes(CityBikeData dataBase)
     {
-        var result = rides
-            .GroupBy(ride => (ride.StartStationName, ride.EndStationName,
-                                ride.StartStationLatitude, ride.StartStationLongitude,
-                                ride.EndStationLatitude, ride.EndStationLongitude,
+        var result = dataBase.Rides
+            .GroupBy(ride => (ride.StartStationId, ride.EndStationId,
                                 ride.StartTime.Month))
-            .Select(group => new
+            .Select(group => 
             {
-                Route = group.Key.StartStationName + " -> " + group.Key.EndStationName,
-                Distance = Haversine(group.Key.StartStationLatitude, group.Key.EndStationLatitude,
-                                        group.Key.StartStationLongitude, group.Key.EndStationLongitude),
-                RideMonth = group.Key.Month,
-                AvgTime = group.Average(ride => ride.TripDuration)
+                Station startStation = dataBase.Stations[group.Key.StartStationId];
+                Station endStation = dataBase.Stations[group.Key.EndStationId];
+
+                return new
+                {
+                    Route = startStation.Name + " -> " + endStation.Name,
+                    Distance = Haversine(startStation.Latitude, endStation.Latitude, startStation.Longitude, endStation.Longitude),
+                    RideMonth = group.Key.Month,
+                    AvgTime = group.Average(ride => ride.TripDuration)
+                };
 
             })
-            .GroupBy(group => group.RideMonth)
+            .GroupBy(route => route.RideMonth)
             .Select(month => new
             {
                 Month = month.Key,
@@ -180,34 +184,35 @@ public static class Queries
     //  6.  3 Najbardziej pożądane stacje w każdym miesiącu (dużo wypożyczeń, 
     //      mało oddań). Test dla proporcji spełniający warunek np > 5 i nq > 5
     //      na poziomie istotności 0.05 zwracam najbardziej pożądane stacje wg. p
-    public static void MostPopularStations(List<BikeRide> rides)
+    public static void MostPopularStations(CityBikeData dataBase)
     {
+
         const double criticalValue = 1.64485;
-        var rents = rides
-            .GroupBy(ride => (ride.StartTime.Month, ride.StartStationName))
+        var rents = dataBase.Rides
+            .GroupBy(ride => (ride.StartTime.Month, ride.StartStationId))
             .Select(ride => new
             {
-                Month = ride.Key.Month,
-                Station = ride.Key.StartStationName,
+                ride.Key.Month,
+                StationId = ride.Key.StartStationId,
                 RentCount = ride.Count()
             });
 
-        var returns = rides
-            .GroupBy(ride => (ride.StopTime.Month, ride.EndStationName))
+        var returns = dataBase.Rides
+            .GroupBy(ride => (ride.StopTime.Month, ride.EndStationId))
             .Select(ride => new
             {
-                Month = ride.Key.Month,
-                Station = ride.Key.EndStationName,
+                ride.Key.Month,
+                Station = ride.Key.EndStationId,
                 ReturnCount = ride.Count()
             });
 
         var statsFiltered = rents.Join(
             returns,
-            rent => (rent.Month, rent.Station), ret => (ret.Month, ret.Station),
+            rent => (rent.Month, rent.StationId), ret => (ret.Month, ret.Station),
             (rent, ret) => new
             {
                 rent.Month,
-                rent.Station,
+                rent.StationId,
                 rent.RentCount,
                 ret.ReturnCount,
                 p = (double)rent.RentCount / (rent.RentCount + ret.ReturnCount),
@@ -217,7 +222,7 @@ public static class Queries
             .Select(stat => new
             {
                 stat.Month,
-                stat.Station,
+                stat.StationId,
                 stat.RentCount,
                 stat.ReturnCount,
                 stat.p,
@@ -242,8 +247,9 @@ public static class Queries
 
             foreach (var station in month.Stations)
             {
+                Station stationData = dataBase.Stations[station.StationId];
                 Console.WriteLine(
-                    $"{station.Station}, " +
+                    $"{stationData.Name}, " +
                     $"p = {station.p:F3}, " +
                     $"U = {station.U:F3}, " +
                     $"rentals = {station.RentCount}, " +
@@ -254,5 +260,8 @@ public static class Queries
 
             Console.WriteLine();
         }
+
+
+
     }    
 }
